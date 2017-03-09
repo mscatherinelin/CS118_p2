@@ -48,7 +48,7 @@ int main(int argc, char* argv[]) {
   printf("Enter message: ");
   fgets(buf, 1024, stdin);
   serverlen = sizeof(serverAddr);
-  n = sendto(clientSocket, buf, strlen(buf), 0, &serverAddr, &serverlen);
+  n = sendto(clientSocket, buf, strlen(buf), 0, &serverAddr, serverlen);
   if (n < 0) 
     perror("Error in sendto\n");
 
