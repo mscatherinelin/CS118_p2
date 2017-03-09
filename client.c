@@ -51,11 +51,12 @@ int main(int argc, char* argv[]) {
   n = sendto(clientSocket, buf, strlen(buf), 0, &serverAddr, serverlen);
   if (n < 0) 
     perror("Error in sendto\n");
-
+  bzero(buf, 1024);
   //get reply from server
-  n = recvfrom(clientSocket, buf, strlen(buf), 0, &serverAddr, &serverlen);
+  n = recvfrom(clientSocket, buf, 1024, 0, &serverAddr, &serverlen);
   if (n < 0) 
     perror("Error in recvfrom\n");
-  printf("Reply from server: %s", buf);
+  printf("%d\n", n);
+  printf("Reply from server: %s\n", buf);
   return 0;
 }
