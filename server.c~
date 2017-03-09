@@ -42,7 +42,7 @@ int main(int argc, char* argv[]){
   //Bind socket with address struct
 
   if (bind(sockfd, (struct sockaddr *) &serveraddr, sizeof(serveraddr)) < 0) 
-    fprintf(stderr,"Error on binding.\n");
+    error("Error on binding.\n");
 
   //main loop wait for datagram
   clientlen = sizeof(clientaddr);
@@ -50,14 +50,14 @@ int main(int argc, char* argv[]){
     bzero(buf, 1024);
     n = recvfrom(sockfd, buf, 1024, 0, (struct sockaddr *) &clientaddr, &clientlen);
     if (n < 0)
-      fprintf(stderr,"Error in recvfrom");
+      error("Error in recvfrom");
 
     hostp = gethostbyaddr((const char *)&clientaddr.sin_addr.s_addr, sizeof(clientaddr.sin_addr.s_addr), AF_INET);
     if (hostp == NULL)
-      fprintf(stderr,"ERROR on gethostbyaddr");
+      error("ERROR on gethostbyaddr");
     hostaddrp = inet_ntoa(clientaddr.sin_addr);
     if (hostaddrp == NULL)
-      fprintf(stderr,"ERROR on inet_ntoa\n");
+      error("ERROR on inet_ntoa\n");
     printf("server received datagram from %s (%s)\n", 
 	   hostp->h_name, hostaddrp);
     printf("server received %d/%d bytes: %s\n", strlen(buf), n, buf);
@@ -68,6 +68,6 @@ int main(int argc, char* argv[]){
     n = sendto(sockfd, buf, strlen(buf), 0, 
 	       (struct sockaddr *) &clientaddr, clientlen);
     if (n < 0) 
-      fprintf(stderr,"ERROR in sendto");
+      error("ERROR in sendto");
   }
 }
