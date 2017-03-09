@@ -1,14 +1,11 @@
+#Makefile
 
-# declare variable
-C = gcc
-CFLAGS= -Wall -o 
-# build an executable named test from test.c
-all: server.c client.c
-	@$(C) $(CFLAGS) server -g server.c
-	@$(C) $(CFLAGS) client -g client.c
-
-server: server.c
-	@$(C) $(CFLAGS) server -g server.c
-
+default: server.c client.c
+	gcc server.c -w -o server
+	gcc client.c -w -o client
 client: client.c
-	@$(C) $(CFLAGS) client -g client.c
+	gcc client.c -w -o client
+server: server.c
+	gcc server.c -w -o server
+clean:
+	rm client server
