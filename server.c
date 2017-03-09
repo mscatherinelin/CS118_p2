@@ -12,7 +12,7 @@ int main(int argc, char* argv[]){
   int sockfd;
   int n;
   int portno;
-  int clientlen;
+  int addrlen;
   struct sockaddr_in serveraddr;
   struct sockaddr_in clientaddr;
   struct hostent *hostp;
@@ -20,7 +20,7 @@ int main(int argc, char* argv[]){
   char *hostaddrp;
   
   if (argc != 2){
-    fprintf(stderr, "incorrect number of arguments used.");
+    perror("incorrect number of arguments used.");
     exit(1);
   }
   portno = atoi(argv[1]);
@@ -29,7 +29,7 @@ int main(int argc, char* argv[]){
   sockfd = socket(AF_INET, SOCK_DGRAM, 0);
   
   if (sockfd == -1) {
-    fprintf(stderr,"Error opening socket");
+    perror("Error opening socket");
     return 0;
   }
   
@@ -45,29 +45,12 @@ int main(int argc, char* argv[]){
     fprintf(stderr,"Error on binding.\n");
 
   //main loop wait for datagram
-  clientlen = sizeof(clientaddr);
+  addrlen = sizeof(serveraddr);
   while(1){
     bzero(buf, 1024);
-    n = recvfrom(sockfd, buf, 1024, 0, (struct sockaddr *) &clientaddr, &clientlen);
-    if (n < 0)
-      fprintf(stderr,"Error in recvfrom");
-
-    hostp = gethostbyaddr((const char *)&clientaddr.sin_addr.s_addr, sizeof(clientaddr.sin_addr.s_addr), AF_INET);
-    if (hostp == NULL)
-      fprintf(stderr,"ERROR on gethostbyaddr");
-    hostaddrp = inet_ntoa(clientaddr.sin_addr);
-    if (hostaddrp == NULL)
-      fprintf(stderr,"ERROR on inet_ntoa\n");
-    printf("server received datagram from %s (%s)\n", 
-	   hostp->h_name, hostaddrp);
-    printf("server received %d/%d bytes: %s\n", strlen(buf), n, buf);
-    
-    /* 
-     * sendto: echo the input back to the client 
-     */
-    n = sendto(sockfd, buf, strlen(buf), 0, 
-	       (struct sockaddr *) &clientaddr, clientlen);
-    if (n < 0) 
-      fprintf(stderr,"ERROR in sendto");
+    n = recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr*)&serveraddr, &addrlen);
+    printf("msg from %s:%d (%d n)\n", inet_ntoa(serveraddr.sin_addr),ntohs(serveraddr.sin_port), n);
+    sendto(sockfd, buf, n, 0, (struct sockaddr*)&serveraddr, sizeof(serveraddr));
   }
+  close(sockfd);
 }
