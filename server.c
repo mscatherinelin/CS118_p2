@@ -59,10 +59,10 @@ int main(int argc, char **argv) {
       continue;
     }
 
+
     //Check to see if the packet is a SYN
-    if(packetReceived.type != 0){
-      perror("Received non-request packet. Ignored\n");
-      continue;
+    if(packetReceived.type == 3){
+      printf("Received FIN\n");
     }
     if(packetReceived.type == 2){
       printf("Received ack\n");
