@@ -64,7 +64,12 @@ int main(int argc, char **argv) {
       perror("Received non-request packet. Ignored\n");
       continue;
     }
-    printf("Received type:%d, seq:%d, ack:%d, size:%d", packetReceived.type, packetReceived.seq, packetReceived.ack, packetReceived.size);
+    if(packetReceived.type == 2){
+      printf("Received ack\n");
+      exit(0);
+    }
+
+    printf("Received type:%d, seq:%d, ack:%d, size:%d\n", packetReceived.type, packetReceived.seq, packetReceived.ack, packetReceived.size);
     filename = packetReceived.data;
 
     file = fopen(filename, "r");
@@ -89,7 +94,7 @@ int main(int argc, char **argv) {
     memcpy(packetSent.data, buf, packetSent.size);
     if(sendto(sockfd, &packetSent, sizeof(packetSent), 0, (struct sockaddr *)&clientaddr,clientlen) == -1)
       perror("Error sending data packet.\n");
-    printf("Sent type:%d, seq%d, ack%d, size%d\n",packetSent.type, packetSent.seq, packetSent.ack, packetSent.size);
+    printf("Sent type:%d, seq:%d, ack:%d, size:%d\n",packetSent.type, packetSent.seq, packetSent.ack, packetSent.size);
 
 
 
