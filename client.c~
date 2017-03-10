@@ -47,15 +47,15 @@ int main(int argc, char* argv[]) {
   serverlen = sizeof(serverAddr);
     
   //generate request packet
-    char* request = argv[2];
+    char* request = argv[3];
     struct packet requestPacket;
     requestPacket.type = 0;
     requestPacket.seq = 0;
     requestPacket.size = strlen(request);
     strcpy(requestPacket.data, request);
-    fprintf(stdout, "%s\n", requestPacket.data); 
+    fprintf(stdout, "%d\n", requestPacket.size); 
     
-    n = sendto(clientSocket, &requestPacket, requestPacket.size, 0, &serverAddr, serverlen);
+    n = sendto(clientSocket, &requestPacket, sizeof(requestPacket), 0, &serverAddr, serverlen);
     if (n < 0)
         perror("Error in sendto\n");
     fprintf(stdout, "Sending packet SYN\n");

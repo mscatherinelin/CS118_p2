@@ -53,9 +53,8 @@ int main(int argc, char* argv[]) {
     requestPacket.seq = 0;
     requestPacket.size = strlen(request);
     strcpy(requestPacket.data, request);
-    fprintf(stdout, "%s\n", requestPacket.data); 
     
-    n = sendto(clientSocket, &requestPacket, requestPacket.size, 0, &serverAddr, serverlen);
+    n = sendto(clientSocket, &requestPacket, sizeof(requestPacket), 0, &serverAddr, serverlen);
     if (n < 0)
         perror("Error in sendto\n");
     fprintf(stdout, "Sending packet SYN\n");
