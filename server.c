@@ -21,6 +21,9 @@ int main(int argc, char **argv) {
   char *hostaddrp; /* dotted decimal host addr string */
   int optval; /* flag value for setsockopt */
   int n; /* message byte size */
+  struct packet packetReceived, packetSent;
+  char* filename;
+  FILE* file;
 
 
   if (argc != 2) {
@@ -49,13 +52,47 @@ int main(int argc, char **argv) {
 
   clientlen = sizeof(clientaddr);
   while (1) {
-    
-    struct packet packetReceived;
-      
+    //waiting for file request
     n = recvfrom(sockfd, &packetReceived, sizeof(packetReceived), 0,(struct sockaddr *) &clientaddr, &clientlen);
-    if (n < 0)
-      perror("Error in receiving packet");
-    //    fprintf(stdout, "%s\n", packetReceived.data);
+    if (n < 0){
+      perror("Error in receiving packet request");
+      continue;
+    }
+
+    //Check to see if the packet is a SYN
+    if(packetReceived.type != 0){
+      perror("Received non-request packet. Ignored\n");
+      continue;
+    }
+    printf("Received type:%d, seq:%d, ack:%d, size:%d", packetReceived.type, packetReceived.seq, packetReceived.ack, packetReceived.size);
+    filename = packetReceived.data;
+
+    file = fopen(filename, "r");
+    if(file == NULL){
+      perror("No such file exists.\n");
+      continue;
+    }
+    //read file into buffer
+    fseek(file, 0L, SEEK_END); //set pointer to end of file
+    long file_size = ftell(file);
+    fseek(file, 0L, SEEK_SET); //set pointer to beginning of file
+    char *buf = malloc(sizeof(char)* file_size);
+    fread(buf, sizeof(char), file_size, file);
+
+    fclose(file);
+
+    //generate packetSent
+    memset((char*)&packetSent, 0, sizeof(packetSent));
+    packetSent.type = 1;
+    packetSent.seq = 0;
+    packetSent.size = 1024; //hardcoded for now
+    memcpy(packetSent.data, buf, packetSent.size);
+    if(sendto(sockfd, &packetSent, sizeof(packetSent), 0, (struct sockaddr *)&clientaddr,clientlen) == -1)
+      perror("Error sending data packet.\n");
+    printf("Sent type:%d, seq%d, ack%d, size%d\n",packetSent.type, packetSent.seq, packetSent.ack, packetSent.size);
+
+
+
     
     n = sendto(sockfd, packetReceived.data, packetReceived.size, 0, (struct sockaddr *) &clientaddr, clientlen);
     if (n < 0)
