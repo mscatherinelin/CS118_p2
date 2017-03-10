@@ -80,7 +80,7 @@ int main(int argc, char **argv) {
     n = recvfrom(sockfd, &packetReceived, BUFSIZE, 0,(struct sockaddr *) &clientaddr, &clientlen);
     if (n < 0)
       perror("Error in receiving packet");
-    fprintf(stdout, "%s\n", packetReceived.data);
+    
       
     n = sendto(sockfd, packetReceived.data, strlen(packetReceived.data), 0, (struct sockaddr *) &clientaddr, clientlen);
     if (n < 0)

@@ -47,7 +47,7 @@ int main(int argc, char* argv[]) {
   serverlen = sizeof(serverAddr);
     
   //generate request packet
-    char* request = argv[3];
+    char* request = argv[2];
     struct packet requestPacket;
     requestPacket.type = 0;
     requestPacket.seq = 0;
