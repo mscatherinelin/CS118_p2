@@ -61,7 +61,7 @@ int main(int argc, char* argv[]) {
     fprintf(stdout, "Sending packet SYN\n");
     
     //file to be written to
-    fp = fopen("received.data", "w+");
+    fp = fopen("received.data", "wb");
     if (fp == NULL)
         perror("Error in opening file\n");
     
@@ -88,8 +88,10 @@ int main(int argc, char* argv[]) {
                 if (receivedPacket.type == 1) {
                     fprintf(stdout, "Received packet with seq num %d, expected seq num %d. Correct packet\n", receivedPacket.seq, expectedSeq);
                     fwrite(receivedPacket.data, 1, receivedPacket.size, fp);
-                    ackPacket.ack = receivedPacket.seq;
+		    ackPacket.ack = receivedPacket.seq;
                     expectedSeq++;
+		    if (expectedSeq == 3)
+		      break;
                 }
                 //FIN
                 else if (receivedPacket.type == 3) {
@@ -102,7 +104,6 @@ int main(int argc, char* argv[]) {
             perror("Error in sending ACK\n");
         fprintf(stdout, "Sending packet with ACK number %d\n", ackPacket.ack);
     }
-    
     //FIN received
     struct packet finPacket;
     finPacket.type = 3;
