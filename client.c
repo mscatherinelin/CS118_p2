@@ -15,7 +15,7 @@ int main(int argc, char* argv[]) {
     struct hostent *server;
     int serverlen, n;
     FILE* fp;
-
+    struct packet requestPacket, receivedPacket, ackPacket;
 
     if (argc != 4) {
         perror("Usage: client <hostname> <port> <filename>\n");
@@ -48,12 +48,12 @@ int main(int argc, char* argv[]) {
     
     //generate request packet
     char* request = argv[3];
-    struct packet requestPacket;
     requestPacket.type = 0;
     requestPacket.seq = 0;
     requestPacket.size = strlen(request);
     strcpy(requestPacket.data, request);
-    
+    fprintf(stdout, "file name: %s\n", requestPacket.data);
+
     int expectedSeq = 0;
     
     if (sendto(clientSocket, &requestPacket, sizeof(requestPacket), 0, &serverAddr, serverlen) < 0)
@@ -61,39 +61,56 @@ int main(int argc, char* argv[]) {
     fprintf(stdout, "Sending packet SYN\n");
     
     //file to be written to
-    fp = fopen(request, "w+");
+    fp = fopen("received.data", "w+");
     if (fp == NULL)
         perror("Error in opening file\n");
     
     //ACK to be sent over
-    struct packet ackPacket;
     ackPacket.type = 2;
-    ackPacket.ack = 1;
+    ackPacket.ack = 0;
     
     //get reply from server
-    struct packet receivedPacket;
-    if (recvfrom(clientSocket, &receivedPacket, sizeof(receivedPacket), 0, &serverAddr, &serverlen) < 0)
-        fprintf(stdout, "Packet lost\n");
-    else {
-        if (receivedPacket.seq > expectedSeq) ;
-        else if (receivedPacket.seq < expectedSeq) {
-            ackPacket.ack = receivedPacket.seq;
-        }
+    while (1) {
+        memset((char*)&receivedPacket, 0, sizeof(receivedPacket));
+        if (recvfrom(clientSocket, &receivedPacket, sizeof(receivedPacket), 0, &serverAddr, &serverlen) < 0)
+            fprintf(stdout, "Packet lost\n");
         else {
-            //DATA
-            if (receivedPacket.type == 1) {
-                fprintf(stdout, "Received packet %d\n", receivedPacket.seq);
-                fwrite(receivedPacket.data, 1, receivedPacket.size, fp);
-                expectedSeq++;
+            if (receivedPacket.seq > expectedSeq) {
+                fprintf("Received packet with seq num %d, expected seq num %d. Ignored\n", receivedPacket.seq, expectedSeq);
+                continue;
             }
-            //FIN
-            else if (receivedPacket.type == 3) {
-                
+            else if (receivedPacket.seq < expectedSeq) {
+                fprintf("Received packet with seq num %d, expected seq num %d. Resent ACK\n", receivedPacket.seq, expectedSeq);
+                ackPacket.ack = receivedPacket.seq;
+            }
+            else {
+                //DATA
+                if (receivedPacket.type == 1) {
+                    fprintf(stdout, "Received packet with seq num %d, expected seq num %d. Correct packet\n", receivedPacket.seq, expectedSeq);
+                    fwrite(receivedPacket.data, 1, receivedPacket.size, fp);
+                    ackPacket.ack = receivedPacket.seq;
+                    expectedSeq++;
+                }
+                //FIN
+                else if (receivedPacket.type == 3) {
+                    fprintf(stdout, "Received FIN packet\n");
+                    break;
+                }
             }
         }
+        if (sendto(clientSocket, &ackPacket, sizeof(ackPacket), 0, &serverAddr, serverlen) < 0)
+            perror("Error in sending ACK\n");
+        fprintf(stdout, "Sending packet with ACK number %d\n", ackPacket.ack);
     }
-    fprintf(stdout, "Sending packet %d\n", ackPacket.ack);
-    if (sendto(clientSocket, &ackPacket, sizeof(ackPacket), 0, &serverAddr, serverlen) < 0)
-        perror("Error in sending ACK\n");
+    
+    //FIN received
+    struct packet finPacket;
+    finPacket.type = 3;
+    finPacket.ack = receivedPacket.seq;
+    
+    if (sendto(clientSocket, &finPacket, sizeof(finPacket), 0, &serverAddr, serverlen) < 0)
+        perror("Error in sending FIN\n");
+    fprintf(stdout, "Sending FIN packet with ACK number %d\n", ackPacket.ack);
+    
     return 0;
 }
