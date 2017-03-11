@@ -72,7 +72,7 @@ int main(int argc, char **argv) {
     printf("Received type:%d, seq:%d, ack:%d, size:%d\n", packetReceived.type, packetReceived.seq, packetReceived.ack, packetReceived.size);
     filename = packetReceived.data;
 
-    file = fopen(filename, "r");
+    file = fopen(filename, "rb");
     if(file == NULL){
       perror("No such file exists.\n");
       continue;
@@ -80,28 +80,36 @@ int main(int argc, char **argv) {
     //read file into buffer
     fseek(file, 0L, SEEK_END); //set pointer to end of file
     long file_size = ftell(file);
+    printf("file size: %d\n", file_size);
     fseek(file, 0L, SEEK_SET); //set pointer to beginning of file
     char *buf = malloc(sizeof(char)* file_size);
     fread(buf, sizeof(char), file_size, file);
 
     fclose(file);
 
-    //generate packetSent
-    memset((char*)&packetSent, 0, sizeof(packetSent));
-    packetSent.type = 1;
-    packetSent.seq = 0;
-    packetSent.size = 1024; //hardcoded for now
-    memcpy(packetSent.data, buf, packetSent.size);
-    if(sendto(sockfd, &packetSent, sizeof(packetSent), 0, (struct sockaddr *)&clientaddr,clientlen) == -1)
-      perror("Error sending data packet.\n");
-    printf("Sent type:%d, seq:%d, ack:%d, size:%d\n",packetSent.type, packetSent.seq, packetSent.ack, packetSent.size);
+    
+    int total_packets = file_size/1024 + (file_size % 1024 != 0); //add extra packet for remaining data
+    int current_packet = 0;
+    int current_seq = 0;
+    int current_position = 0;
+    while (current_packet < total_packets){
+      //Create packet
+      memset((char*)&packetSent, 0, sizeof(packetSent));
+      packetSent.type = 1; //Data packet
+      packetSent.seq = current_seq;
+      packetSent.size = (file_size - current_position < 1024) ? file_size - current_position : 1024; 
+      memcpy(packetSent.data, buf + current_position, packetSent.size);
 
+      if(sendto(sockfd, &packetSent, sizeof(packetSent), 0, (struct sockaddr *)&clientaddr,clientlen) == -1)
+        perror("Error sending data packet.\n");
+      printf("Sent type:%d, seq:%d, ack:%d, size:%d\n",packetSent.type, packetSent.seq, packetSent.ack, packetSent.size);
+      current_packet++;
+      current_seq++;
+      current_position+= 1024;
 
+    }
+    
 
     
-    n = sendto(sockfd, packetReceived.data, packetReceived.size, 0, (struct sockaddr *) &clientaddr, clientlen);
-    if (n < 0)
-        perror("ERROR in sendto");
-
   }
 }
