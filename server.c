@@ -10,10 +10,22 @@
 #include "packet.h"
 
 typedef struct node {
-    int seq;
-    int ack;
-    struct node* next;
+  int seq;
+  int ack;
+  int offset;
+  int size;
+  struct node* next;
 };
+
+struct node* head;
+
+struct packet timeoutFunc(char* buf) {
+  struct packet retransmittedPacket;
+  retransmittedPacket.type = 1;
+  retransmittedPacket.seq = head->seq;
+  memcpy(retransmittedPacket.data, buf + head->offset, head->size); 
+  return retransmittedPacket;
+}
 
 int main(int argc, char **argv) {
   int sockfd, portno, clientlen;
@@ -23,7 +35,6 @@ int main(int argc, char **argv) {
   struct packet packetReceived, packetSent, finPacket;
   char* filename;
   FILE* file;
-
 
   if (argc != 2) {
     fprintf(stderr, "usage: %s <port>\n", argv[0]);
@@ -77,12 +88,12 @@ int main(int argc, char **argv) {
     int current_seq = 0;
     int current_position = 0;
       
-    int sent = 0;
-    struct node* head = malloc(sizeof(struct node));
+    head = malloc(sizeof(struct node));
     struct node* newPacket;
 
     while (current_packet < total_packets) {
-        if (sent <= 4) {
+        int sent = 0;
+        while (sent <= 4 && current_position < file_size) {            
             //Create packet
             memset((char*)&packetSent, 0, sizeof(packetSent));
             packetSent.type = 1; //Data packet
@@ -93,12 +104,16 @@ int main(int argc, char **argv) {
             if (current_seq == 0) {
                 head->seq = packetSent.seq;
                 head->ack = 0;
+		head->offset = 0;
+		head->size = packetSent.size;
                 head->next = NULL;
             }
             else {
                 newPacket = malloc(sizeof(struct node));
                 newPacket->seq = packetSent.seq;
                 newPacket->ack = 0;
+		newPacket->offset = current_position;
+		newPacket->size = packetSent.size;
                 newPacket->next = NULL;
                 if (head == NULL)
                     head = newPacket;
@@ -113,40 +128,58 @@ int main(int argc, char **argv) {
 
             if(sendto(sockfd, &packetSent, sizeof(packetSent), 0, (struct sockaddr *)&clientaddr,clientlen) == -1)
                 perror("Error sending data packet.\n");
-            printf("Sent packet type %d with seq num %d and size %d\n",packetSent.type, packetSent.seq, packetSent.size);
-            current_packet++;
-            current_seq++;
-            current_position += 1024;
-            sent++;
+           printf("Sent packet type %d with seq num %d and size %d\n",packetSent.type, packetSent.seq, packetSent.size);
+           current_packet++;
+           current_seq++;
+           current_position += 1024;
+           sent++;
         }
         
-        memset((char*)&packetReceived, 0, sizeof(packetReceived));
-        if (recvfrom(sockfd, &packetReceived, sizeof(packetReceived), 0,(struct sockaddr *) &clientaddr, &clientlen) < 0)
-          fprintf(stdout,"Error receiving packet\n");
+        int ackedPackets = 0;
+        fd_set readSet;
+        struct timespec timeout = {0,500};
+ 
+        while (ackedPackets < sent) {
+            FD_ZERO(&readSet);
+            FD_SET(sockfd, &readSet);
+
+            if (select(sockfd + 1, &readSet, NULL, NULL, &timeout) < 0)
+                perror("Error on select\n");
+            else if (!FD_ISSET(sockfd, &readSet)) {
+                fprintf(stdout, "Timeout\n");
+                struct packet packetToSend = timeoutFunc(buf);
+		if (sendto(sockfd, &packetToSend, sizeof(packetToSend), 0, (struct sockaddr*)&clientaddr, clientlen) == -1)
+		    perror("Error in sending retransmitted packet\n");
+		printf("Retransmitted packet with seq num %d and size %d\n", packetToSend.seq, packetToSend.size);
+            }
+          
+            memset((char*)&packetReceived, 0, sizeof(packetReceived));
+            if (recvfrom(sockfd, &packetReceived, sizeof(packetReceived), 0,(struct sockaddr *) &clientaddr, &clientlen) < 0)
+                fprintf(stdout,"Error receiving packet\n");
         
-        //ACK received
-        if (packetReceived.type == 2) {
-            fprintf(stdout, "Received packet with ack number %d\n", packetReceived.ack);
-            if (head->seq == packetReceived.ack) {
-                head->ack = 1;
-                int count = 0;
-                while(head != NULL && head->ack == 1) {
-                    head = head->next;
-                    count++;
+            //ACK received
+            if (packetReceived.type == 2) {
+                fprintf(stdout, "Received packet with ack number %d\n", packetReceived.ack);
+                if (head->seq == packetReceived.ack) {
+                    head->ack = 1;
+                    int count = 0;
+                    while(head != NULL && head->ack == 1) {
+                        head = head->next;
+                        count++;
+                    }
+                    sent = sent - count;
+                    fprintf(stdout, "Moving over window by %d\n", count);
                 }
-                sent = sent - count;
-                fprintf(stdout, "Moving over window by %d\n", count);
-                
+                else {
+                    fprintf(stdout, "Not moving over window\n");
+                    struct node* curr = head;
+                    while (curr != NULL && curr->seq != packetReceived.ack)
+                        curr = curr->next;
+                    if (curr != NULL)
+                        curr->ack = 1;
+                }
             }
-            else {
-                fprintf(stdout, "Not moving over window\n");
-                struct node* curr = head;
-                while (curr != NULL && curr->seq != packetReceived.ack)
-                    curr = curr->next;
-                if (curr != NULL)
-                    curr->ack = 1;
-            }
-        }
+	}
     }
     memset((char*)&finPacket, 0, sizeof(finPacket));
     finPacket.type = 3;
