@@ -75,6 +75,7 @@ int main(int argc, char* argv[]) {
         if (recvfrom(clientSocket, &receivedPacket, sizeof(receivedPacket), 0, &serverAddr, &serverlen) < 0)
             fprintf(stdout, "Packet lost\n");
         else {
+	  fprintf(stdout, "type of packet received: %d\n", receivedPacket.type);
             if (receivedPacket.seq > expectedSeq) {
                 fprintf("Received packet with seq num %d, expected seq num %d. Ignored\n", receivedPacket.seq, expectedSeq);
                 continue;
@@ -93,7 +94,7 @@ int main(int argc, char* argv[]) {
                 }
                 //FIN
                 else if (receivedPacket.type == 3) {
-                    fprintf(stdout, "Received FIN packet\n");
+                    printf("Received FIN packet\n");
                     break;
                 }
             }

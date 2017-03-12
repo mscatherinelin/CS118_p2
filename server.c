@@ -147,15 +147,13 @@ int main(int argc, char **argv) {
                     curr->ack = 1;
             }
         }
-        //FIN received
-
-          memset((char*)&finPacket, 0, sizeof(packetSent));
-          finPacket.type = 3;
-          if(sendto(sockfd, &finPacket, sizeof(finPacket), 0, (struct sockaddr *)&clientaddr,clientlen) == -1)
-              perror("Error sending FIN packet.\n"); 
-
-            
-      }
     }
+    memset((char*)&finPacket, 0, sizeof(finPacket));
+    finPacket.type = 3;
+    finPacket.seq = current_seq;
+    fprintf(stdout, "Sending FIN packet\n");
+    if(sendto(sockfd, &finPacket, sizeof(finPacket), 0, (struct sockaddr *)&clientaddr,clientlen) == -1)
+        perror("Error sending FIN packet.\n");
   }
 }
+
