@@ -86,7 +86,7 @@ int main(int argc, char* argv[]) {
             else {
                 //DATA
                 if (receivedPacket.type == 1) {
-                    fprintf(stdout, "Received packet with seq num %d, expected seq num %d. Correct packet\n", receivedPacket.seq, expectedSeq);
+		  fprintf(stdout, "Received packet with seq num %d, expected seq num %d, and size %d. Correct packet\n", receivedPacket.seq, expectedSeq, receivedPacket.size);
                     fwrite(receivedPacket.data, 1, receivedPacket.size, fp);
 		    ackPacket.ack = receivedPacket.seq;
                     expectedSeq++;
@@ -103,6 +103,7 @@ int main(int argc, char* argv[]) {
         fprintf(stdout, "Sending packet with ACK number %d\n", ackPacket.ack);
     }
     //FIN received
+    /*
     struct packet finPacket;
     finPacket.type = 3;
     finPacket.ack = receivedPacket.seq;
@@ -110,6 +111,7 @@ int main(int argc, char* argv[]) {
     if (sendto(clientSocket, &finPacket, sizeof(finPacket), 0, &serverAddr, serverlen) < 0)
         perror("Error in sending FIN\n");
     fprintf(stdout, "Sending FIN packet with ACK number %d\n", ackPacket.ack);
-    
+    */
+    fclose(fp);
     return 0;
 }
