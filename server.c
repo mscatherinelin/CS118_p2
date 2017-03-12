@@ -181,12 +181,36 @@ int main(int argc, char **argv) {
             }
 	}
     }
+    //send FIN
     memset((char*)&finPacket, 0, sizeof(finPacket));
     finPacket.type = 3;
     finPacket.seq = current_seq;
     fprintf(stdout, "Sending FIN packet\n");
     if(sendto(sockfd, &finPacket, sizeof(finPacket), 0, (struct sockaddr *)&clientaddr,clientlen) == -1)
         perror("Error sending FIN packet.\n");
+
+    memset((char*)&packetReceived, 0, sizeof(packetReceived));
+    if (recvfrom(sockfd, &packetReceived, sizeof(packetReceived), 0,(struct sockaddr *) &clientaddr, &clientlen) < 0)
+        fprintf(stdout,"Error receiving packet\n");
+    if(packetReceived.type == 2 && packetReceived.ack == finPacket.seq ){
+      printf("Received FIN ACK with ACK number: %d\n", packetReceived.ack);
+      fd_set readSetFin;
+      FD_ZERO(&readSetFin);
+      FD_SET(sockfd, &readSetFin); 
+      struct timespec FINtimeout = {0,1000};
+      if (select(sockfd + 1, &readSetFin, NULL, NULL, &FINtimeout) < 0)
+          perror("Error on select\n");
+      else if (!FD_ISSET(sockfd, &readSetFin)) {
+          fprintf(stdout, "Connection Closed\n");
+    }
+
+  
+
+  }
+
+
+
+
   }
 }
 
