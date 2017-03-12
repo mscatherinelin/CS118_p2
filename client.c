@@ -46,10 +46,34 @@ int main(int argc, char* argv[]) {
     serverAddr.sin_port = htons(portno);
     serverlen = sizeof(serverAddr);
     
+    //Three Way Handshake
+    //generate SYN
+    struct packet SYN;
+    SYN.type = 4;
+    SYN.seq = 0;
+    if (sendto(clientSocket, &SYN, sizeof(SYN), 0, &serverAddr, serverlen) < 0)
+      perror("Error in three way handhake\n");
+
+    //receive SYNACK
+    while (1) {
+      memset((char*)&receivedPacket, 9, sizeof(receivedPacket));
+      if (recvfrom(clientSocket, &receivedPacket, sizeof(receivedPacket), 0, &serverAddr, &serverlen) < 0)
+	fprintf(stdout, "SYN ACK lost\n");
+      else {
+	if (receivedPacket.type == 2 && receivedPacket.ack == -1)
+	  break;
+	else {
+	  fprintf(stdout, "Error in SYN ACK received\n");
+	  exit(-1);
+	}
+      }
+    }
+    
     //generate request packet
     char* request = argv[3];
     requestPacket.type = 0;
     requestPacket.seq = 0;
+    requestPacket.ack = -1;
     requestPacket.size = strlen(request);
     strcpy(requestPacket.data, request);
     fprintf(stdout, "file name: %s\n", requestPacket.data);
@@ -104,15 +128,15 @@ int main(int argc, char* argv[]) {
         fprintf(stdout, "Sending packet with ACK number %d\n", ackPacket.ack);
     }
     //FIN received
-    /*
-    struct packet finPacket;
-    finPacket.type = 3;
-    finPacket.ack = receivedPacket.seq;
+    struct packet FIN_ACK;
+    FIN_ACK.type = 2;
+    FIN_ACK.ack = receivedPacket.seq;
     
-    if (sendto(clientSocket, &finPacket, sizeof(finPacket), 0, &serverAddr, serverlen) < 0)
-        perror("Error in sending FIN\n");
-    fprintf(stdout, "Sending FIN packet with ACK number %d\n", ackPacket.ack);
-    */
+    if (sendto(clientSocket, &FIN_ACK, sizeof(FIN_ACK), 0, &serverAddr, serverlen) < 0)
+        perror("Error in sending FIN ACK\n");
+    fprintf(stdout, "Sending FIN ACK with ACK number %d\n", FIN_ACK.ack);
+    fprintf(stdout, "Connection closed\n");
     fclose(fp);
+    close(clientSocket);
     return 0;
 }
