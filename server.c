@@ -20,7 +20,7 @@ int main(int argc, char **argv) {
   struct sockaddr_in serveraddr, clientaddr;
   struct hostent *hostp;
   char *hostaddrp;
-  struct packet packetReceived, packetSent;
+  struct packet packetReceived, packetSent, finPacket;
   char* filename;
   FILE* file;
 
@@ -148,9 +148,14 @@ int main(int argc, char **argv) {
             }
         }
         //FIN received
-        else if (packetReceived.type == 3) {
+
+          memset((char*)&finPacket, 0, sizeof(packetSent));
+          finPacket.type = 3;
+          if(sendto(sockfd, &finPacket, sizeof(finPacket), 0, (struct sockaddr *)&clientaddr,clientlen) == -1)
+              perror("Error sending FIN packet.\n"); 
+
             
-        }
+      }
     }
   }
 }
