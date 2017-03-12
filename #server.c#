@@ -16,16 +16,12 @@ typedef struct node {
 };
 
 int main(int argc, char **argv) {
-  int sockfd; /* socket */
-  int portno; /* port to listen on */
-  int clientlen; /* byte size of client's address */
-  struct sockaddr_in serveraddr; /* server's addr */
-  struct sockaddr_in clientaddr; /* client addr */
-  struct hostent *hostp; /* client host info */
+  int sockfd, portno, clientlen;
+  struct sockaddr_in serveraddr, clientaddr;
+  struct hostent *hostp; 
   char *hostaddrp; /* dotted decimal host addr string */
   int optval; /* flag value for setsockopt */
-  int n; /* message byte size */
-  struct packet packetReceived, packetSent;
+  
   char* filename;
   FILE* file;
 
@@ -122,7 +118,7 @@ int main(int argc, char **argv) {
 
             if(sendto(sockfd, &packetSent, sizeof(packetSent), 0, (struct sockaddr *)&clientaddr,clientlen) == -1)
                 perror("Error sending data packet.\n");
-            printf("Sent type:%d, seq:%d, size:%d\n",packetSent.type, packetSent.seq, packetSent.ack, packetSent.size);
+            printf("Sent packet of type %d with seq num %d and size %d\n",packetSent.type, packetSent.seq, packetSent.size);
             current_packet++;
             current_seq++;
             current_position+= 1024;
@@ -150,8 +146,10 @@ int main(int argc, char **argv) {
                 struct node* curr = head;
                 while (curr != NULL && curr->seq != packetReceived.ack)
                     curr = curr->next;
-                if (curr != NULL)
+                if (curr != NULL) {
                     curr->ack = 1;
+		    sent--;
+		}
             }
         }
         else if (packetReceived.type == 3) {

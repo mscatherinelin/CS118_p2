@@ -9,18 +9,17 @@
 #include <arpa/inet.h>
 #include "packet.h"
 
-#define BUFSIZE 1024
+typedef struct node {
+    int seq;
+    int ack;
+    struct node* next;
+};
 
 int main(int argc, char **argv) {
-  int sockfd; /* socket */
-  int portno; /* port to listen on */
-  int clientlen; /* byte size of client's address */
-  struct sockaddr_in serveraddr; /* server's addr */
-  struct sockaddr_in clientaddr; /* client addr */
-  struct hostent *hostp; /* client host info */
-  char *hostaddrp; /* dotted decimal host addr string */
-  int optval; /* flag value for setsockopt */
-  int n; /* message byte size */
+  int sockfd, portno, clientlen;
+  struct sockaddr_in serveraddr, clientaddr;
+  struct hostent *hostp;
+  char *hostaddrp;
   struct packet packetReceived, packetSent;
   char* filename;
   FILE* file;
@@ -37,9 +36,6 @@ int main(int argc, char **argv) {
   if (sockfd < 0) 
     perror("ERROR opening socket");
 
-  optval = 1;
-  setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, 
-	     (const void *)&optval , sizeof(int));
 
   bzero((char *) &serveraddr, sizeof(serveraddr));
   serveraddr.sin_family = AF_INET;
@@ -63,10 +59,8 @@ int main(int argc, char **argv) {
     filename = packetReceived.data;
 
     file = fopen(filename, "rb");
-    if(file == NULL){
+    if(file == NULL)
       perror("No such file exists.\n");
-      continue;
-    }
       
     //read file into buffer
     fseek(file, 0L, SEEK_END); //set pointer to end of file
@@ -82,33 +76,81 @@ int main(int argc, char **argv) {
     int current_packet = 0;
     int current_seq = 0;
     int current_position = 0;
+      
+    int sent = 0;
+    struct node* head = malloc(sizeof(struct node));
+    struct node* newPacket;
 
     while (current_packet < total_packets) {
+        if (sent <= 4) {
+            //Create packet
+            memset((char*)&packetSent, 0, sizeof(packetSent));
+            packetSent.type = 1; //Data packet
+            packetSent.seq = current_seq;
+            packetSent.size = (file_size - current_position < 1024) ? file_size - current_position : 1024;
+            memcpy(packetSent.data, buf + current_position, packetSent.size);
         
-      //Create packet
-      memset((char*)&packetSent, 0, sizeof(packetSent));
-      packetSent.type = 1; //Data packet
-      packetSent.seq = current_seq;
-      packetSent.size = (file_size - current_position < 1024) ? file_size - current_position : 1024; 
-      memcpy(packetSent.data, buf + current_position, packetSent.size);
+            if (current_seq == 0) {
+                head->seq = packetSent.seq;
+                head->ack = 0;
+                head->next = NULL;
+            }
+            else {
+                newPacket = malloc(sizeof(struct node));
+                newPacket->seq = packetSent.seq;
+                newPacket->ack = 0;
+                newPacket->next = NULL;
+                if (head == NULL)
+                    head = newPacket;
+                else {
+                    struct node* curr = head;
+                    while (curr->next != NULL) {
+                        curr = curr->next;
+                    }
+                    curr->next = newPacket;
+                }
+            }
 
-      if(sendto(sockfd, &packetSent, sizeof(packetSent), 0, (struct sockaddr *)&clientaddr,clientlen) == -1)
-        perror("Error sending data packet.\n");
-      printf("Sent type:%d, seq:%d, size:%d\n",packetSent.type, packetSent.seq, packetSent.ack, packetSent.size);
-      current_packet++;
-      current_seq++;
-      current_position+= 1024;
+            if(sendto(sockfd, &packetSent, sizeof(packetSent), 0, (struct sockaddr *)&clientaddr,clientlen) == -1)
+                perror("Error sending data packet.\n");
+            printf("Sent packet type %d with seq num %d and size %d\n",packetSent.type, packetSent.seq, packetSent.size);
+            current_packet++;
+            current_seq++;
+            current_position += 1024;
+            sent++;
+        }
         
-      memset((char*)&packetReceived, 0, sizeof(packetReceived));
-      if (recvfrom(sockfd, &packetReceived, sizeof(packetReceived), 0,(struct sockaddr *) &clientaddr, &clientlen) < 0)
+        memset((char*)&packetReceived, 0, sizeof(packetReceived));
+        if (recvfrom(sockfd, &packetReceived, sizeof(packetReceived), 0,(struct sockaddr *) &clientaddr, &clientlen) < 0)
           fprintf(stdout,"Error receiving packet\n");
         
-      if (packetReceived.type == 2)
-          fprintf(stdout, "Received packet with ack number %d\n", packetReceived.ack);
-      else if (packetReceived.type == 3) {
+        //ACK received
+        if (packetReceived.type == 2) {
+            fprintf(stdout, "Received packet with ack number %d\n", packetReceived.ack);
+            if (head->seq == packetReceived.ack) {
+                head->ack = 1;
+                int count = 0;
+                while(head != NULL && head->ack == 1) {
+                    head = head->next;
+                    count++;
+                }
+                sent = sent - count;
+                fprintf(stdout, "Moving over window by %d\n", count);
+                
+            }
+            else {
+                fprintf(stdout, "Not moving over window\n");
+                struct node* curr = head;
+                while (curr != NULL && curr->seq != packetReceived.ack)
+                    curr = curr->next;
+                if (curr != NULL)
+                    curr->ack = 1;
+            }
+        }
+        //FIN received
+        else if (packetReceived.type == 3) {
             
         }
-
     }
   }
 }

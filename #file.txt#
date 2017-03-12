@@ -1,0 +1,7 @@
+if (sendto(clientSocket, &ackPacket, sizeof(ackPacket), 0, &serverAddr, serverlen) < 0)
+            perror("Error in sending ACK\n");
+        fprintf(stdout, "Sending packet with ACK number %d\n", ackPacket.ack
+
+if (sendto(clientSocket, &ackPacket, sizeof(ackPacket), 0, &serverAddr, serverlen) < 0)
+            perror("Error in sending ACK\n");
+        fprintf(stdout, "Sending packet with ACK number %d\n", ackPacket.a

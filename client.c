@@ -90,8 +90,6 @@ int main(int argc, char* argv[]) {
                     fwrite(receivedPacket.data, 1, receivedPacket.size, fp);
 		    ackPacket.ack = receivedPacket.seq;
                     expectedSeq++;
-		    if (expectedSeq == 3)
-		      break;
                 }
                 //FIN
                 else if (receivedPacket.type == 3) {
