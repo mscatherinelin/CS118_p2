@@ -64,8 +64,21 @@ int main(int argc, char **argv) {
       perror("Error in receiving packet request");
       continue;
     }
-    
-    if (packetReceived.type == 0)
+
+    //Three way handshake
+    if (packetReceived.type == 4){
+      printf("Received SYN packet.\n");
+      memset((char*)&packetSent, 0, sizeof(packetSent));
+      packetSent.type = 2; //ACK
+      packetSent.seq = 0;
+      packetSent.ack = -1;
+      if(sendto(sockfd, &packetSent, sizeof(packetSent), 0, (struct sockaddr *)&clientaddr,clientlen) == -1)
+          perror("Error sending SYN ACK.\n");
+      continue;
+    }
+
+  
+    if (packetReceived.type == 0 && packetReceived.ack == -1)
         printf("Received request for file %s\n", packetReceived.data);
     filename = packetReceived.data;
 
@@ -189,6 +202,7 @@ int main(int argc, char **argv) {
     if(sendto(sockfd, &finPacket, sizeof(finPacket), 0, (struct sockaddr *)&clientaddr,clientlen) == -1)
         perror("Error sending FIN packet.\n");
 
+    //set FIN timeout
     memset((char*)&packetReceived, 0, sizeof(packetReceived));
     if (recvfrom(sockfd, &packetReceived, sizeof(packetReceived), 0,(struct sockaddr *) &clientaddr, &clientlen) < 0)
         fprintf(stdout,"Error receiving packet\n");
