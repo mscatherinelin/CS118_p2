@@ -24,6 +24,7 @@ struct packet timeoutFunc(char* buf) {
   retransmittedPacket.type = 1;
   retransmittedPacket.seq = head->seq;
   memcpy(retransmittedPacket.data, buf + head->offset, head->size); 
+  retransmittedPacket.size = head->size;
   return retransmittedPacket;
 }
 
@@ -42,11 +43,9 @@ int main(int argc, char **argv) {
   }
   portno = atoi(argv[1]);
 
-
   sockfd = socket(AF_INET, SOCK_DGRAM, 0);
   if (sockfd < 0) 
     perror("ERROR opening socket");
-
 
   bzero((char *) &serveraddr, sizeof(serveraddr));
   serveraddr.sin_family = AF_INET;
@@ -77,7 +76,6 @@ int main(int argc, char **argv) {
       continue;
     }
 
-  
     if (packetReceived.type == 0 && packetReceived.ack == -1)
         printf("Received request for file %s\n", packetReceived.data);
     filename = packetReceived.data;
@@ -152,8 +150,8 @@ int main(int argc, char **argv) {
         fd_set readSet;
         struct timespec timeout = {0,500};
  
-        while (ackedPackets < sent) {
-            FD_ZERO(&readSet);
+        while (ackedPackets < sent) {	  
+	  /*FD_ZERO(&readSet);
             FD_SET(sockfd, &readSet);
 
             if (select(sockfd + 1, &readSet, NULL, NULL, &timeout) < 0)
@@ -164,8 +162,11 @@ int main(int argc, char **argv) {
 		if (sendto(sockfd, &packetToSend, sizeof(packetToSend), 0, (struct sockaddr*)&clientaddr, clientlen) == -1)
 		    perror("Error in sending retransmitted packet\n");
 		printf("Retransmitted packet with seq num %d and size %d\n", packetToSend.seq, packetToSend.size);
-            }
-          
+		ackedPackets++;
+		continue;
+	    }
+	  */
+	  
             memset((char*)&packetReceived, 0, sizeof(packetReceived));
             if (recvfrom(sockfd, &packetReceived, sizeof(packetReceived), 0,(struct sockaddr *) &clientaddr, &clientlen) < 0)
                 fprintf(stdout,"Error receiving packet\n");
@@ -215,16 +216,9 @@ int main(int argc, char **argv) {
       if (select(sockfd + 1, &readSetFin, NULL, NULL, &FINtimeout) < 0)
           perror("Error on select\n");
       else if (!FD_ISSET(sockfd, &readSetFin)) {
-          fprintf(stdout, "Connection Closed\n");
+          fprintf(stdout, "Connection closed\n");
+      }  
     }
-
-  
-
-  }
-
-
-
-
   }
 }
 

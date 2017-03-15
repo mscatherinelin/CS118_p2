@@ -79,7 +79,12 @@ int main(int argc, char* argv[]) {
     fprintf(stdout, "file name: %s\n", requestPacket.data);
 
     int expectedSeq = 0;
-    
+    struct packet** buf = malloc(5*sizeof(struct packet*));
+    int i;
+    for (i = 0; i < 5; i++)
+      buf[i] = NULL;
+    int bufCount = 0;
+
     if (sendto(clientSocket, &requestPacket, sizeof(requestPacket), 0, &serverAddr, serverlen) < 0)
         perror("Error in sendto\n");
     fprintf(stdout, "Sending packet SYN\n");
@@ -96,37 +101,95 @@ int main(int argc, char* argv[]) {
     //get reply from server
     while (1) {
         memset((char*)&receivedPacket, 0, sizeof(receivedPacket));
-        if (recvfrom(clientSocket, &receivedPacket, sizeof(receivedPacket), 0, &serverAddr, &serverlen) < 0)
+        if (recvfrom(clientSocket, &receivedPacket, sizeof(receivedPacket), 0, &serverAddr, &serverlen) < 0) {
             fprintf(stdout, "Packet lost\n");
-        else {
-	  fprintf(stdout, "type of packet received: %d\n", receivedPacket.type);
-            if (receivedPacket.seq > expectedSeq) {
+            continue;
+        }
+        
+        //FIN
+        if (receivedPacket.type == 3) {
+            printf("Received FIN packet\n");
+            break;
+        }
+        
+        //DATA
+        if (receivedPacket.type == 1) {
+            int min = expectedSeq;
+            int max = expectedSeq + 4;
+            int prevWinMin = expectedSeq - 5;
+            int prevWinMax = expectedSeq - 1;
+            fprintf(stdout,"min value: %d, max value: %d\n", min, max);
+            //write to file if in order
+            if (receivedPacket.seq == expectedSeq) {
+                fprintf(stdout, "Received packet with seq num %d, expected seq num %d. Correct packet\n", receivedPacket.seq, expectedSeq, receivedPacket.size);
+                fwrite(receivedPacket.data, 1, receivedPacket.size, fp);
+                ackPacket.ack = receivedPacket.seq;
+                expectedSeq++;
+                
+                //write buffer contents
+		for (i = 0; i < 5; i++) {
+		   if(buf[i] != NULL)
+			fprintf(stdout, "sequence number in buffer %d\n", buf[i]->seq);		
+		}
+                for (i = 0; i < 5; i++) {
+                    if (buf[i] != NULL && buf[i]->seq == expectedSeq) {
+			fprintf(stdout,"Writing buffer to file\n");
+                        fwrite(buf[i]->data, 1, buf[i]->size, fp);
+			buf[i] = NULL;                        
+			i = -1;
+                        expectedSeq++;
+                    }
+                }
+                //adjust buffer
+                struct packet** buf2 = malloc(5*sizeof(struct packet*));
+                bufCount = 0;
+                for (i = 0; i < 5; i++)
+                    buf2[i] = NULL;
+                for(i = 0; i < 5; i++) {
+                    if (buf[i] != NULL) {
+                        buf2[bufCount] = buf[i];
+                        bufCount++;
+                    }
+                }
+                buf = buf2;
+            }
+            //buffer if in window
+            else if (receivedPacket.seq > min && receivedPacket.seq <= max) {
+		fprintf(stdout, "adding to buffer\n");
+                if (bufCount < 5) {
+		    struct packet* packetToBuffer = malloc(sizeof(struct packet));
+		    packetToBuffer->seq = receivedPacket.seq;
+		    packetToBuffer->size = receivedPacket.size;
+		    memcpy(packetToBuffer->data, receivedPacket.data, receivedPacket.size);
+                    buf[bufCount] = packetToBuffer;
+                    bufCount++;
+                    ackPacket.ack = receivedPacket.seq;
+                    fprintf(stdout,"Received packet with seq num %d, expected seq num %d. Buffered packet and sent ACK\n", buf[bufCount-1]->seq, expectedSeq);
+		}
+		for (i = 0; i < 5; i++) {
+		   if(buf[i] != NULL)
+			fprintf(stdout, "Packet in buf with seq num %d\n", buf[i]->seq);		
+		}
+            }
+            //send ACK if in previous window
+            else if (prevWinMin >= 0 && prevWinMax > 0) {
+                if (receivedPacket.seq >= prevWinMin && receivedPacket.seq <= prevWinMax) {
+                    fprintf(stdout,"Received packet with seq num %d, expected seq num %d. Resent ACK\n", receivedPacket.seq, expectedSeq);
+                    ackPacket.ack = receivedPacket.seq;
+                }
+            }
+            else {
                 fprintf("Received packet with seq num %d, expected seq num %d. Ignored\n", receivedPacket.seq, expectedSeq);
                 continue;
             }
-            else if (receivedPacket.seq < expectedSeq) {
-                fprintf("Received packet with seq num %d, expected seq num %d. Resent ACK\n", receivedPacket.seq, expectedSeq);
-                ackPacket.ack = receivedPacket.seq;
-            }
-            else {
-                //DATA
-                if (receivedPacket.type == 1) {
-		  fprintf(stdout, "Received packet with seq num %d, expected seq num %d, and size %d. Correct packet\n", receivedPacket.seq, expectedSeq, receivedPacket.size);
-                    fwrite(receivedPacket.data, 1, receivedPacket.size, fp);
-		    ackPacket.ack = receivedPacket.seq;
-                    expectedSeq++;
-                }
-                //FIN
-                else if (receivedPacket.type == 3) {
-                    printf("Received FIN packet\n");
-                    break;
-                }
-            }
         }
+        
         if (sendto(clientSocket, &ackPacket, sizeof(ackPacket), 0, &serverAddr, serverlen) < 0)
             perror("Error in sending ACK\n");
         fprintf(stdout, "Sending packet with ACK number %d\n", ackPacket.ack);
+        
     }
+    
     //FIN received
     struct packet FIN_ACK;
     FIN_ACK.type = 2;
