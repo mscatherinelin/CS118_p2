@@ -5,7 +5,6 @@
 #include <netdb.h>
 #include <sys/types.h> 
 #include <sys/socket.h>
-//#include <time.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include "packet.h"
@@ -59,10 +58,12 @@ int main(int argc, char **argv) {
     perror("ERROR on binding");
 
   clientlen = sizeof(clientaddr);
-  while (1) {
-    //waiting for file request
+
+  while(1){
+    //waiting for SYN
+    memset((char*)&packetReceived, 0, sizeof(packetReceived));
     if (recvfrom(sockfd, &packetReceived, sizeof(packetReceived), 0,(struct sockaddr *) &clientaddr, &clientlen) < 0) {
-      perror("Error in receiving packet request");
+      perror("Error in receiving SYN\n");
       continue;
     }
 
@@ -75,6 +76,13 @@ int main(int argc, char **argv) {
       packetSent.ack = -1;
       if(sendto(sockfd, &packetSent, sizeof(packetSent), 0, (struct sockaddr *)&clientaddr,clientlen) == -1)
           perror("Error sending SYN ACK.\n");
+      break;
+    }
+  }
+  while (1) {
+    memset((char*)&packetReceived, 0, sizeof(packetReceived));
+    if (recvfrom(sockfd, &packetReceived, sizeof(packetReceived), 0,(struct sockaddr *) &clientaddr, &clientlen) < 0) {
+      perror("Error in receiving packet request");
       continue;
     }
 
