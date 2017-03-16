@@ -183,21 +183,14 @@ int main(int argc, char **argv) {
 	    }
 	    timers[i]->timer = endTime;
 	  }
-	  /*FD_ZERO(&readSet);
+	    FD_ZERO(&readSet);
             FD_SET(sockfd, &readSet);
 
             if (select(sockfd + 1, &readSet, NULL, NULL, &timeout) < 0)
                 perror("Error on select\n");
             else if (!FD_ISSET(sockfd, &readSet)) {
-                fprintf(stdout, "Timeout\n");
-                struct packet packetToSend = timeoutFunc(buf);
-		if (sendto(sockfd, &packetToSend, sizeof(packetToSend), 0, (struct sockaddr*)&clientaddr, clientlen) == -1)
-		    perror("Error in sending retransmitted packet\n");
-		printf("Retransmitted packet with seq num %d and size %d\n", packetToSend.seq, packetToSend.size);
-		ackedPackets++;
-		continue;
+     		continue;
 	    }
-	  */
 	  
             memset((char*)&packetReceived, 0, sizeof(packetReceived));
             if (recvfrom(sockfd, &packetReceived, sizeof(packetReceived), 0,(struct sockaddr *) &clientaddr, &clientlen) < 0)
