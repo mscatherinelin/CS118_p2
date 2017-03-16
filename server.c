@@ -5,6 +5,7 @@
 #include <netdb.h>
 #include <sys/types.h> 
 #include <sys/socket.h>
+//#include <time.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include "packet.h"
@@ -36,6 +37,7 @@ int main(int argc, char **argv) {
   struct packet packetReceived, packetSent, finPacket;
   char* filename;
   FILE* file;
+  struct packet** timers = malloc(5*sizeof(struct packet*));
 
   if (argc != 2) {
     fprintf(stderr, "usage: %s <port>\n", argv[0]);
@@ -104,6 +106,7 @@ int main(int argc, char **argv) {
 
     while (current_packet < total_packets) {
         int sent = 0;
+	int i = 0;
         while (sent <= 4 && current_position < file_size) {            
             //Create packet
             memset((char*)&packetSent, 0, sizeof(packetSent));
@@ -111,8 +114,17 @@ int main(int argc, char **argv) {
             packetSent.seq = current_seq;
             packetSent.size = (file_size - current_position < 1024) ? file_size - current_position : 1024;
             memcpy(packetSent.data, buf + current_position, packetSent.size);
-        
-            if (current_seq == 0) {
+
+	    //Add packet with timer to array	    
+	    struct packet* packetWithTimer = malloc(sizeof(struct packet));
+	    packetWithTimer->seq = packetSent.seq;
+	    packetWithTimer->type = 1;
+	    packetWithTimer->size = packetSent.size;
+	    memcpy(packetWithTimer->data, packetSent.data, packetSent.size);
+	    clock_gettime(CLOCK_REALTIME, &(packetWithTimer->timer));
+            timers[i] = packetWithTimer;
+
+	    if (current_seq == 0) {
                 head->seq = packetSent.seq;
                 head->ack = 0;
 		head->offset = 0;
@@ -144,13 +156,25 @@ int main(int argc, char **argv) {
            current_seq++;
            current_position += 1024;
            sent++;
+	   i++;
         }
         
         int ackedPackets = 0;
         fd_set readSet;
         struct timespec timeout = {0,500};
  
-        while (ackedPackets < sent) {	  
+        while (ackedPackets < sent) {	 
+	  struct timespec endTime;
+	  clock_gettime(CLOCK_REALTIME, &endTime);
+	  int i;
+	  for (i = 0; i < 5; i++) {
+	    int diff = endTime.tv_sec - timers[i]->timer.tv_sec;
+	    if (diff >= 0.5) {
+	      if (sendto(sockfd, timers[i], sizeof(*timers[i]), 0, (struct sockaddr*)&clientaddr, clientlen) == -1)
+		perror("Error in retransmitted packet\n");
+	    }
+	    timers[i]->timer = endTime;
+	  }
 	  /*FD_ZERO(&readSet);
             FD_SET(sockfd, &readSet);
 
